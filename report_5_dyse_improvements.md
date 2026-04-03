@@ -1,0 +1,1 @@
+Report 5 covers documentation and maintainability aspects of the 'dyse' repository. Update README with clear setup and usage instructions. Add inline comments for complex logic and create API documentation for public functions.
