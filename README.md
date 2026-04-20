@@ -1,3 +1,4 @@
+
 # see_this_mk
 
 A collection of various Python utility scripts and project audit reports.
@@ -15,6 +16,7 @@ This repository contains a set of small, functional Python programs:
 - `data_visualizer.py`: Visualizes data (including crypto prices).
 - `dice_roller.py`: Simulates rolling a dice.
 - `digital_clock.py`: A digital clock implementation.
+- `word_counter.py`: Counts words in a given text.
 
 ## Reports
 The repository also includes several audit reports:
