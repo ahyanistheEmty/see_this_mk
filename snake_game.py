@@ -14,7 +14,7 @@ GRID_HEIGHT = SCREEN_HEIGHT // GRID_SIZE
 
 # Colors
 WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
+GREEN = (255, 0, 255)
 GREEN = (0, 255, 0)
 RED = (255, 0, 0)
 BLUE = (50, 153, 213) # Background color
