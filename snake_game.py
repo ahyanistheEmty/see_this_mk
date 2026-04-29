@@ -14,12 +14,14 @@ GRID_HEIGHT = SCREEN_HEIGHT // GRID_SIZE
 
 # Colors
 WHITE = (255, 255, 255)
-ORANGE = (255, 165, 0) # Changed from GREEN to ORANGE
+ORANGE = (255, 165, 0) # Snake color
 RED = (255, 0, 0)
 BLUE = (50, 153, 213) # Background color
 
 # Snake properties
-SNAKE_SPEED = 10 # Frames per second
+# SNAKE_SPEED_FACTOR now affects how quickly the snake's velocity matches the target direction
+SNAKE_SPEED_FACTOR = 0.2 # How much velocity tries to match target direction per frame (0 to 1)
+# INITIAL_SNAKE_SPEED = 5 # Base speed of the snake - this is no longer directly used for movement step
 
 # --- Set up the display ---
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -37,7 +39,6 @@ def display_score(score):
 
 def draw_snake(snake_block, snake_list):
     """Draws the snake on the screen."""
-    # The snake is now drawn in ORANGE color
     for x in snake_list:
         pygame.draw.rect(screen, ORANGE, [x[0], x[1], snake_block, snake_block])
 
@@ -52,11 +53,15 @@ def game_loop():
     game_over = False
     game_close = False
 
-    # Initial snake position and movement
+    # Initial snake position
     x1 = SCREEN_WIDTH / 2
     y1 = SCREEN_HEIGHT / 2
-    x1_change = 0
-    y1_change = 0
+
+    # Physics-based movement variables
+    dx = 0 # Current horizontal velocity
+    dy = 0 # Current vertical velocity
+    target_dx = 0 # Desired horizontal direction
+    target_dy = 0 # Desired vertical direction
 
     snake_list = []
     length_of_snake = 1
@@ -65,7 +70,15 @@ def game_loop():
     foodx = round(random.randrange(0, SCREEN_WIDTH - GRID_SIZE) / GRID_SIZE) * GRID_SIZE
     foody = round(random.randrange(0, SCREEN_HEIGHT - GRID_SIZE) / GRID_SIZE) * GRID_SIZE
 
+    # --- Game Timer ---
+    # We'll use the timer to control movement steps rather than clock.tick directly
+    # This allows for more consistent movement regardless of frame rate fluctuations.
+    MOVE_INTERVAL = 100 # milliseconds between snake movements
+    last_move_time = pygame.time.get_ticks()
+
     while not game_over:
+        current_time = pygame.time.get_ticks()
+
         while game_close:
             screen.fill(BLUE)
             message("You Lost! Press Q-Quit or C-Play Again", RED)
@@ -84,66 +97,81 @@ def game_loop():
             if event.type == pygame.QUIT:
                 game_over = True
             if event.type == pygame.KEYDOWN:
+                # Set target direction, but prevent immediate 180 turns
                 if event.key == pygame.K_LEFT:
-                    if x1_change == GRID_SIZE: # Prevent 180-degree turn
-                        continue
-                    x1_change = -GRID_SIZE
-                    y1_change = 0
+                    if target_dx != GRID_SIZE: # If not already moving right
+                        target_dx = -GRID_SIZE
+                        target_dy = 0
                 elif event.key == pygame.K_RIGHT:
-                    if x1_change == -GRID_SIZE: # Prevent 180-degree turn
-                        continue
-                    x1_change = GRID_SIZE
-                    y1_change = 0
+                    if target_dx != -GRID_SIZE: # If not already moving left
+                        target_dx = GRID_SIZE
+                        target_dy = 0
                 elif event.key == pygame.K_UP:
-                    if y1_change == GRID_SIZE: # Prevent 180-degree turn
-                        continue
-                    y1_change = -GRID_SIZE
-                    x1_change = 0
+                    if target_dy != GRID_SIZE: # If not already moving down
+                        target_dy = -GRID_SIZE
+                        target_dx = 0
                 elif event.key == pygame.K_DOWN:
-                    if y1_change == -GRID_SIZE: # Prevent 180-degree turn
-                        continue
-                    y1_change = GRID_SIZE
-                    x1_change = 0
+                    if target_dy != -GRID_SIZE: # If not already moving up
+                        target_dy = GRID_SIZE
+                        target_dx = 0
 
-        # Check for boundary collision
-        if x1 >= SCREEN_WIDTH or x1 < 0 or y1 >= SCREEN_HEIGHT or y1 < 0:
-            game_close = True
+        # --- Physics Simulation for Movement ---
+        # Gradually move current velocity towards target direction
+        dx += (target_dx - dx) * SNAKE_SPEED_FACTOR
+        dy += (target_dy - dy) * SNAKE_SPEED_FACTOR
 
-        x1 += x1_change
-        y1 += y1_change
-        screen.fill(BLUE)
+        # Apply velocity, scaled by time elapsed and a base speed
+        # We round to nearest GRID_SIZE to keep it on the grid, but the dx/dy are continuous
+        # This provides a smoother movement.
+        elapsed_time_ms = current_time - last_move_time
+        if elapsed_time_ms >= MOVE_INTERVAL:
+            x1 += dx * (MOVE_INTERVAL / 1000) # Scale movement by time
+            y1 += dy * (MOVE_INTERVAL / 1000)
 
-        # Draw food
-        pygame.draw.rect(screen, RED, [foodx, foody, GRID_SIZE, GRID_SIZE])
+            # Snap to grid position for collision and drawing consistency
+            # This ensures the snake segments align properly
+            x1 = round(x1 / GRID_SIZE) * GRID_SIZE
+            y1 = round(y1 / GRID_SIZE) * GRID_SIZE
+            
+            last_move_time = current_time # Reset timer
 
-        # Update snake body
-        snake_head = []
-        snake_head.append(x1)
-        snake_head.append(y1)
-        snake_list.append(snake_head)
-
-        # Limit snake length
-        if len(snake_list) > length_of_snake:
-            del snake_list[0]
-
-        # Check for self-collision
-        for x in snake_list[:-1]:
-            if x == snake_head:
+            # Check for boundary collision
+            if x1 >= SCREEN_WIDTH or x1 < 0 or y1 >= SCREEN_HEIGHT or y1 < 0:
                 game_close = True
 
-        # Draw snake
-        draw_snake(GRID_SIZE, snake_list)
-        display_score(length_of_snake - 1)
+            # Update snake body
+            snake_head = []
+            snake_head.append(x1)
+            snake_head.append(y1)
+            snake_list.append(snake_head)
 
-        pygame.display.update()
+            # Limit snake length
+            if len(snake_list) > length_of_snake:
+                del snake_list[0]
 
-        # Check for food collision
-        if x1 == foodx and y1 == foody:
-            foodx = round(random.randrange(0, SCREEN_WIDTH - GRID_SIZE) / GRID_SIZE) * GRID_SIZE
-            foody = round(random.randrange(0, SCREEN_HEIGHT - GRID_SIZE) / GRID_SIZE) * GRID_SIZE
-            length_of_snake += 1
+            # Check for self-collision
+            for segment in snake_list[:-1]:
+                if segment == snake_head:
+                    game_close = True
+                    break # Exit loop early if collision detected
 
-        clock.tick(SNAKE_SPEED)
+            # --- Drawing and Display Update ---
+            screen.fill(BLUE)
+            # Draw food
+            pygame.draw.rect(screen, RED, [foodx, foody, GRID_SIZE, GRID_SIZE])
+            # Draw snake
+            draw_snake(GRID_SIZE, snake_list)
+            display_score(length_of_snake - 1)
+            pygame.display.update()
+
+            # Check for food collision
+            if x1 == foodx and y1 == foody:
+                foodx = round(random.randrange(0, SCREEN_WIDTH - GRID_SIZE) / GRID_SIZE) * GRID_SIZE
+                foody = round(random.randrange(0, SCREEN_HEIGHT - GRID_SIZE) / GRID_SIZE) * GRID_SIZE
+                length_of_snake += 1
+
+        # Control frame rate - this is now more for rendering smoothness than movement speed
+        clock.tick(60) # Aim for 60 frames per second for rendering
 
     pygame.quit()
     quit()
